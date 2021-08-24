@@ -245,4 +245,5 @@ def main():
 
 main()
 
-# Todo: draft campaign exclusion
+# TODO1: draft campaign exclusion
+# TODO2: error handling
