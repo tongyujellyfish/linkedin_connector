@@ -19,6 +19,9 @@ DATASET = config.DATASET_ID
 TABLE = config.DESTINATION_TABLE 
 ACCOUNT_ID = config.ACCOUNT_ID
 client_secrets_path = config.SERVICE_CREDENTIALS
+ORG_ID ="2942816"
+# ORG_ID ="2414183"
+TABLE_ORGANIC='linkedin_organic'
 
 
 
@@ -112,6 +115,7 @@ def get_campaigns_list(access_token, account_id,now_time,date,headers,yesterday_
     }
     endpoint = 'https://api.linkedin.com/v2/adCampaignsV2'
     url = urllib.parse.urlencode(request_data)
+
     print("\n\nget campaigns called")
     campaign_list = []
     stop_datafetch =  False
@@ -119,7 +123,6 @@ def get_campaigns_list(access_token, account_id,now_time,date,headers,yesterday_
         response_campaigns = requests.get(endpoint + '?' + url, headers = headers)
         data = response_campaigns.json()
         print("response code:",response_campaigns.status_code)
-        print(response_campaigns.url)
   
         if 'elements' in data.keys():
             data = data['elements']
@@ -169,12 +172,6 @@ def get_linkedin_data(access_token, campaign,fields,yesterday,headers):
         'dateRange.end.year': yesterday.year,
         'dateRange.end.month': yesterday.month,
         'dateRange.end.day': yesterday.day,
-        # 'dateRange.start.year': 2021,
-        # 'dateRange.start.month':8,
-        # 'dateRange.start.day': 19,
-        # 'dateRange.end.year': 2021,
-        # 'dateRange.end.month': 8,
-        # 'dateRange.end.day':19,
         'timeGranularity': 'DAILY',
         'campaigns[0]':'urn:li:sponsoredCampaign:' + str(campaign['id']),
         'pivot':'CAMPAIGN',
@@ -184,7 +181,6 @@ def get_linkedin_data(access_token, campaign,fields,yesterday,headers):
     response_campaigns = requests.get(endpoint + '?' + url, headers = headers)
     elements = response_campaigns.json()['elements']
 
-    print(elements)
     datadict = {}    
     for field in fields:
         datadict[field] = elements[0][field] if len(elements) > 0 and field in elements[0].keys() else 0
@@ -193,7 +189,37 @@ def get_linkedin_data(access_token, campaign,fields,yesterday,headers):
     datadict['name'] =  campaign['name']
     return [datadict]
 
-
+def get_organic_data(access_token,yesterday_ts_start,yesterday_ts_end,headers):
+    endpoint = 'https://api.linkedin.com/v2/organizationalEntityShareStatistics'
+    data = {
+        'q':'organizationalEntity',
+        'organizationalEntity':'urn:li:organization:' + ORG_ID,
+        'timeIntervals.timeRange.start': yesterday_ts_start*1000,
+        'timeIntervals.timeRange.end':yesterday_ts_end*1000,
+    }
+    url = urllib.parse.urlencode(data)
+    response = requests.get(endpoint + '?' + url, headers = headers).json()
+    dataList = []
+    if 'elements' in response.keys():
+        response = response['elements']
+        for item in response:
+            datadict = {}
+            datadict["clickCount"] = item["totalShareStatistics"]["clickCount"]
+            datadict["engagement"] = item["totalShareStatistics"]["engagement"]
+            datadict["likeCount"] = item["totalShareStatistics"]["likeCount"]
+            datadict["commentCount"] = item["totalShareStatistics"]["commentCount"]
+            datadict["shareCount"] = item["totalShareStatistics"]["shareCount"]
+            datadict["impressionCount"] = item["totalShareStatistics"]["impressionCount"]
+            datadict["startTime"] = item["timeRange"]["start"]
+            datadict["endTime"] = item["timeRange"]["end"]
+            datadict["organizationId"] =ORG_ID
+            print(datadict)
+            dataList.append(datadict)
+        print(f"Organic metrics retrieved for ognazation {ORG_ID}") 
+    else:
+        print(f"No organic metrics found for ognazation {ORG_ID}")
+    return dataList
+ 
 def main():
     #service account's authentication
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = client_secrets_path
@@ -214,11 +240,13 @@ def main():
     for zone in timezonelist:
         tz = timezone(zone)
         now_time = datetime.now(tz)
-        yesterday = now_time - timedelta(3)  # 1days back
+        yesterday = now_time - timedelta(5)  # 1days back
         date = datetime.strftime(yesterday, fmt)
         yesterday_ts_start = tz.localize(datetime(yesterday.year,yesterday.month,yesterday.day,0,0,0)).timestamp() # the timestamp of start of yesterday
         yesterday_ts_end = tz.localize(datetime(yesterday.year,yesterday.month,yesterday.day,23,59,59)).timestamp()
-        print(yesterday_ts_start,yesterday_ts_end)
+        organic_data = get_organic_data(access_token,yesterday_ts_start,yesterday_ts_end,headers)
+        df_organic = pd.DataFrame.from_dict(organic_data)
+
         new_campaign_list = get_campaigns_list(access_token, ACCOUNT_ID,now_time,date,headers,yesterday_ts_start,yesterday_ts_end)
         time.sleep(5)
 
@@ -231,6 +259,7 @@ def main():
         client = bigquery.Client()
         job_config = bigquery.job.LoadJobConfig()
         table_ref = client.dataset(DATASET).table(TABLE)
+        table_ref_organic = client.dataset(DATASET).table(TABLE_ORGANIC)
 
         # writing the data to BigQuery table
         try:
@@ -239,6 +268,14 @@ def main():
             print("records written to BQ table")        
         except Exception as e:
             print("Failed to write data to table:%s\n" % e)
+            # writing the data to BigQuery table
+        try:
+            job_organic = client.load_table_from_dataframe(df_organic,table_ref_organic,job_config=job_config,project=PROJECT)
+            job.result()
+            print("organic records written to BQ table")        
+        except Exception as e:
+            print("Failed to write organic data to table:%s\n" % e)
+
 
 # # For local debugging
 # if __name__ == '__main__':
@@ -247,3 +284,5 @@ main()
 
 # TODO1: draft campaign exclusion
 # TODO2: error handling
+
+
