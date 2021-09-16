@@ -190,10 +190,72 @@ def get_linkedin_data(campaign,yesterday,headers):
     except Exception as e:
             print("Failed to get campaign metrics:%s\n" % e)
     return []
+def get_organic_list(account_id,yesterday_ts_start, yesterday_ts_end,last_year,access_token ):
+    headers2 = {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json',
+        'Authorization': f'Bearer {access_token}',
+        'cache-control': 'no-cache',
+        'X-Restli-Protocol-Version': '2.0.0'
+    }
+    
+    try:
+        param_select = 100
+        param_skip = 0
+        print(f"\nGetting organic posts list for Account {account_id}")
+        post_list = []
+        stop_datafetch =  False
+        while not stop_datafetch:
+            response_posts = requests.get(f"https://api.linkedin.com/v2/ugcPosts?q=authors&authors=List(urn%3Ali%3Aorganization%3A{account_id})&count={param_select}&start={param_skip}", headers = headers2)
+            data = response_posts.json()
+            print("response code:",response_posts.status_code)
+            if response_posts.status_code == 200:
+                if 'elements' in data.keys():
+                    data = data['elements']
+                    data_filtered = list(filter(lambda x: x['created']['time']>last_year *1000,data ))
+                    if len(data_filtered) == 0:
+                        print("total posts fetched:",len(post_list))
+                        stop_datafetch =  True
+                        break
+                    else:
+                        for element in data_filtered:
+                            post_dict ={}
+                            # # media can be empty []
+                            media = element['specificContent']['com.linkedin.ugc.ShareContent']['media']
+                            if len(media) > 0 and 'title' in media[0].keys() :
+                                post_dict['title'] =  media[0]['title']['text']
+                            else:
+                                post_dict['title'] = element['specificContent']['com.linkedin.ugc.ShareContent']['shareCommentary']['text']
+                            post_dict['id'] = element['id']
+                            post_dict['post_type'] = 'shares'
+                            post_dict['created_time'] =element['created']['time']
+                            if 'ugcPost' in post_dict['id']:
+                                post_dict['post_type'] = 'ugcPosts'
+                            post_list.append(post_dict)
+    
+                        
+                        if  len(data_filtered) < param_select:
+                            print("total posts fetched:",len(post_list))
+                            stop_datafetch =  True
+                            break
+                        else:
+                            param_skip += param_select
+                else:
+                    print("No post fetched")
+                    stop_datafetch =  True
+                    break     
+            else:
+                print(response.json())                                 
+    except Exception as e:
+            print("Failed to get orgnaic post list:%s\n" % e)
+    return post_list   
 
-def get_organic_data(yesterday_ts_start,yesterday_ts_end,headers,org_id):
+
+def get_organic_data(yesterday_ts_start,yesterday_ts_end,headers,org_id,post):
     try: 
-        print(f"\nGetting organic data for ognazation {org_id}")
+        post_type = post['post_type']
+        post_id = post['id']
+        print(f"\nGetting organic data for ognazation {org_id}: {post_id}")
         endpoint = 'https://api.linkedin.com/v2/organizationalEntityShareStatistics'
         data = {
             'q':'organizationalEntity',
@@ -201,14 +263,14 @@ def get_organic_data(yesterday_ts_start,yesterday_ts_end,headers,org_id):
             'timeIntervals.timeRange.start': yesterday_ts_start*1000,
             'timeIntervals.timeRange.end':yesterday_ts_end*1000,
         }
+        data[post_type] = post_id
         url = urllib.parse.urlencode(data)
         response = requests.get(endpoint + '?' + url, headers = headers)
-
         print("response code:",response.status_code)
         if response.status_code == 200:
             response = response.json()
             dataList = []
-            if 'elements' in response.keys():
+            if 'elements' in response.keys() and len(response['elements']) >0:
                 response = response['elements']
                 for item in response:
                     datadict = {}
@@ -221,19 +283,24 @@ def get_organic_data(yesterday_ts_start,yesterday_ts_end,headers,org_id):
                     datadict["startTime"] = item["timeRange"]["start"]
                     datadict["endTime"] = item["timeRange"]["end"]
                     datadict["organizationId"] = org_id
+                    datadict["postType"] = post_type
+                    datadict["postID"] = post_id
+                    datadict['title'] = post['title']
+                    datadict['createdTime'] = post['created_time']
                     dataList.append(datadict)
-                print(f"Organic metrics retrieved for ognazation {org_id}") 
+                print(f"Organic metrics retrieved for ognazation {org_id} : {post_id}") 
                 return dataList
             else:
-                print(f"No organic metrics found for ognazation {org_id}")
+                print(f"No organic metrics found for ognazation {org_id} : {post_id}")
         else:
             print(response.json())
     except Exception as e:
             print("Failed to get organic data:%s\n" % e)
  
 def main():
-    secret = get_secret()
-    access_token = check_token(secret)
+    # secret = get_secret()
+    # access_token = check_token(secret)
+    access_token ='AQXS2KhoLhT34KufwTxNlcl7PCNrT6w0Fse90Dnx7aK_YAHUyfYrghy78vLGJU7tF6mciaKkEPBlfO9jqRrBwYeC52N3b2CggiqzRy6bXmP2M3SBVKuc-ceUTs6YVB0y3fkq4CXyWf75hIIzMMvefSREWxK5SuqTaXWfNHyvGflf1ZcYMPYwyVfQijou7tEepOUz4ZOYlKmcqCODfGGwau3w2KrMAwC-3vj8IAVX-6ou3tvsjwUULEU4UQGaQASL5eZBx9PbsGo8C8IsPmJI95wOPUOINkWLYpXpii5XfmVp16_qgONB33cRHWN-H6tZhJWSRerAFowbG3eqQNe3FEYetSgoig'
     headers = {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Accept': 'application/json',
@@ -250,13 +317,13 @@ def main():
         date = datetime.strftime(yesterday, fmt)
         yesterday_ts_start = tz.localize(datetime(yesterday.year,yesterday.month,yesterday.day,0,0,0)).timestamp() # the timestamp of start of yesterday
         yesterday_ts_end = tz.localize(datetime(yesterday.year,yesterday.month,yesterday.day,23,59,59)).timestamp()
+        last_year = datetime(now_time.year-1,now_time.month,now_time.day,0,0,0).timestamp()
 
         print("Time in GMT now %s" %now_time)
         print("Appending data for  %s"%date)
 
         # Getting Paid campaign data
         new_campaign_list = get_campaigns_list(ACCOUNT_ID, headers,yesterday_ts_start, yesterday_ts_end)
-        time.sleep(5)
 
         campaign_data = []
         if len(new_campaign_list) != 0:
@@ -271,7 +338,6 @@ def main():
         table_ref_organic = client.dataset(DATASET).table(TABLE_ORGANIC)
 
         # writing paid campaign data to BigQuery table
-        
         try:
             if not df.empty:
                 job = client.load_table_from_dataframe(df,table_ref,job_config=job_config,project=PROJECT)
@@ -281,11 +347,19 @@ def main():
                 print('No campaign data returned, BQ not called')        
         except Exception as e:
             print("Failed to write campaign data to table:%s\n" % e)
-
         
+        # Getting organic posts list                               
+        new_post_list = get_organic_list('2942816',yesterday_ts_start, yesterday_ts_end,last_year,access_token)
+
         # Getting organic data
-        organic_data = get_organic_data(yesterday_ts_start,yesterday_ts_end,headers,ORG_ID)
-        df_organic = pd.DataFrame.from_dict(organic_data)
+        organic_data = []
+        if len(new_post_list) != 0:
+            for post in new_post_list:                
+                post_data = get_organic_data(yesterday_ts_start,yesterday_ts_end,headers,ORG_ID,post)
+                if post_data:
+                    organic_data += post_data
+        df_organic = pd.DataFrame.from_dict(organic_data)        
+
         # writing organic data to BigQuery table
         try:
             if not df_organic.empty:
@@ -303,5 +377,4 @@ def main():
 
 
 
-
-
+main()
