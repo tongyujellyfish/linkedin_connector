@@ -298,9 +298,9 @@ def get_organic_data(yesterday_ts_start,yesterday_ts_end,headers,org_id,post):
             print("Failed to get organic data:%s\n" % e)
  
 def main():
-    # secret = get_secret()
-    # access_token = check_token(secret)
-    access_token ='AQXS2KhoLhT34KufwTxNlcl7PCNrT6w0Fse90Dnx7aK_YAHUyfYrghy78vLGJU7tF6mciaKkEPBlfO9jqRrBwYeC52N3b2CggiqzRy6bXmP2M3SBVKuc-ceUTs6YVB0y3fkq4CXyWf75hIIzMMvefSREWxK5SuqTaXWfNHyvGflf1ZcYMPYwyVfQijou7tEepOUz4ZOYlKmcqCODfGGwau3w2KrMAwC-3vj8IAVX-6ou3tvsjwUULEU4UQGaQASL5eZBx9PbsGo8C8IsPmJI95wOPUOINkWLYpXpii5XfmVp16_qgONB33cRHWN-H6tZhJWSRerAFowbG3eqQNe3FEYetSgoig'
+    secret = get_secret()
+    access_token = check_token(secret)
+
     headers = {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Accept': 'application/json',
