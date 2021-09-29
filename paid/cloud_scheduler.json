@@ -1,0 +1,4 @@
+
+// cloud scheduler body
+{"linkedin_campaign_id":"linkedin_campaign_id", "gcp_project_id":"gcp_project_id","bq_dataset":"bq_dataset","bq_table_paid":"bq_table_paid"}
+

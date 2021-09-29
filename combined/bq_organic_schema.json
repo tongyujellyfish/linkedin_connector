@@ -1,0 +1,80 @@
+[
+  {
+    "description": "Number of clicks.",
+    "name": "clickCount",
+    "type": "INTEGER",
+    "mode": "NULLABLE"
+  },
+  {
+    "description": "Number of organic clicks, likes, comments, and shares over impressions.",
+    "name": "engagement",
+    "type": "FLOAT",
+    "mode": "NULLABLE"
+  },
+  {
+    "description": "Number of likes. This field can become negative when members who liked a sponsored share later unlike it. The like is not counted since it is not organic, but the unlike is counted as organic.",
+    "name": "likeCount",
+    "type": "INTEGER",
+    "mode": "NULLABLE"
+  },
+  {
+    "description": "Number of comments.",
+    "name": "commentCount",
+    "type": "INTEGER",
+    "mode": "NULLABLE"
+  },
+  {
+    "description": "Number of shares.",
+    "name": "shareCount",
+    "type": "INTEGER",
+    "mode": "NULLABLE"
+  },
+  {
+    "description": "Number of impressions.",
+    "name": "impressionCount",
+    "type": "INTEGER",
+    "mode": "NULLABLE"
+  },
+  {
+    "description": "",
+    "name": "startTime",
+    "type": "INTEGER",
+    "mode": "NULLABLE"
+  },
+  {
+    "description": "",
+    "name": "endTime",
+    "type": "INTEGER",
+    "mode": "NULLABLE"
+  },
+  {
+    "description": "Organization's Linkedin account id",
+    "name": "organizationId",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "description": "Post type can be ugcPosts(videos) or shares",
+    "name": "postType",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "description": "Post id",
+    "name": "postID",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "description": "Title of the post, or shareCommentary text if post has no title.",
+    "name": "title",
+    "type": "STRING",
+    "mode": "NULLABLE"
+  },
+  {
+    "description": "Post created time",
+    "name": "createdTime",
+    "type": "INTEGER",
+    "mode": "NULLABLE"
+  }  
+]
