@@ -64,7 +64,7 @@ Give &lt;developer_name>@jellyfish.com owner access to the project.
 
 If GCP project owner access is not possible, request BigQuery Data Editor and Job User permission to the following service account:
 
-linkedin-connector@linkedin-327306.iam.gserviceaccount.com 
+drd-linkedin-bq@linkedin-327306.iam.gserviceaccount.com
 
 Note : we are well aware of the principle of least privilege but we ask the maximum permission to avoid going back and forth for each additional access; once the service has been set up, the permissions can be reduced.
 
@@ -80,11 +80,9 @@ Configurations:
  - HTTP headers: Content-Type:application/octet-stream, User-Agent:
    Google-Cloud-Scheduler 
  - Body: 
-    Paid:
-   {"linkedin_campaign_id":"linkedin_campaign_id", "gcp_project_id":"gcp_project_id","bq_dataset":"bq_dataset","bq_table_paid":"bq_table_paid"}
-   Organic:  {"linkedin_organization_id":"linkedin_organization_id","gcp_project_id":"gcp_project_id","bq_dataset":"bq_dataset","bq_table_organic":"bq_table_organic"
-   } 
+    Paid: {"ad_account_id":"client_ad_accountId", "client_project_id":"client_gcp_project_id","destination_table":"projectId.datasetId.tableId","dataset_loc":"dataset_loc" }
+   Organic: {"account_id":"client_linkedin_organisation_id", "client_project_id":"client_gcp_project_id","destination_table":"projectId.datasetId.tableId","dataset_loc":"dataset_loc" }
  - Auth header: Add OIDC token 
- - Service account:   linkedin-connector@linkedin-327306.iam.gserviceaccount.com
+ - Service account:   drd-linkedin-bq@linkedin-327306.iam.gserviceaccount.com
  - Audience: &lt;Cloud function trigger URL>
 

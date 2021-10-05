@@ -1,4 +1,3 @@
 
 // cloud scheduler body
-{"linkedin_campaign_id":"linkedin_campaign_id", "gcp_project_id":"gcp_project_id","bq_dataset":"bq_dataset","bq_table_paid":"bq_table_paid"}
-
+{"ad_account_id":"client_ad_accountId", "client_project_id":"client_gcp_project_id","destination_table":"projectId.datasetId.tableId","dataset_loc":"dataset_loc" }

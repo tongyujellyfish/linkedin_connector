@@ -1,5 +1,48 @@
 [
   {
+    "description": "campaign id",
+    "name": "id",
+    "type": "INTEGER",
+    "mode": "REQUIRED"
+  },
+  {
+    "description": "campaign name",
+    "name": "name",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "description": "The GMT date of the metric returned",
+    "name": "date",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+
+  {
+    "description": "URN identifying the campaign group associated with the campaign.",
+    "name": "campaignGroup",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "description": "Flag showing whether this campaign is a test campaign, i.e., belongs to a test account. This is a read-only and immutable field that is set implicitly during creation based on whether the account is a Test Account or not.",
+    "name": "is_test",
+    "type": "BOOL",
+    "mode": "REQUIRED"
+  },
+  {
+    "description": "Campaign Objective type values. Including BRAND_AWARENESS, ENGAGEMENT, JOB_APPLICANTS, LEAD_GENERATION, WEBSITE_CONVERSIONS, WEBSITE_VISITS, VIDEO_VIEWS",
+    "name": "objectiveType",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
+    "description": "CPM - Cost per thousand advertising impressions. If type=SPONSORED_INMAILS; cost per send (CPS) is measured as CPM x 1000. CPC - Cost per individual click on the associated link. CPV- Cost per view for video ads.",
+    "name": "costType",
+    "type": "STRING",
+    "mode": "REQUIRED"
+  },
+  {
     "description": "The count of clicks on the action button of the Sponsored Messaging ad. Sponsored Messaging ads only.",
     "name": "actionClicks",
     "type": "INTEGER",
@@ -376,23 +419,5 @@
     "name": "viralVideoViews",
     "type": "INTEGER",
     "mode": "NULLABLE"
-  },
-  {
-    "description": "campaign id",
-    "name": "id",
-    "type": "INTEGER",
-    "mode": "REQUIRED"
-  },
-  {
-    "description": "campaign name",
-    "name": "name",
-    "type": "STRING",
-    "mode": "REQUIRED"
-  },
-  {
-    "description": "The GMT date of the metric returned",
-    "name": "date",
-    "type": "STRING",
-    "mode": "REQUIRED"
   }
 ]

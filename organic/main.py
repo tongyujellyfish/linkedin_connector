@@ -11,29 +11,43 @@ import urllib
 import configurations as config
 import math 
 import base64
+from google.oauth2 import service_account
+
 
 #below configurations are set in the configurations file
 SERVICE_CREDENTIALS = config.SERVICE_CREDENTIALS
 SECRET_MANAGER_PATH = config.SECRET_MANAGER_PATH
-
-#service account's authentication
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = SERVICE_CREDENTIALS
+SLACK_HOOK = config.SLACK_HOOK
 
 def get_secret(name=SECRET_MANAGER_PATH):
     try:
         # Create the Secret Manager client.
-        client = secretmanager.SecretManagerServiceClient()
+        credentials_sm = service_account.Credentials.from_service_account_file(SERVICE_CREDENTIALS)
+        client_sm = secretmanager.SecretManagerServiceClient(credentials=credentials_sm)
 
         # Build the resource name of the secret version.
         name = name
 
         # Access the secret version.
-        response = client.access_secret_version(request={"name": name})
+        response = client_sm.access_secret_version(request={"name": name})
         secret = base64.decodebytes(response.payload.data).decode("UTF-8")
         print('client secret loaded')
         return json.loads(secret)
     except Exception as e:
         print("Failed to get client secret:%s\n" % e)
+
+def send_slack_alert(slack_data,webhook_url=SLACK_HOOK):    
+    response = requests.post(
+        webhook_url, data=json.dumps({'text':slack_data}),
+        headers={'Content-Type': 'application/json'}
+    )
+    if response.status_code != 200:
+        raise ValueError(
+            'Request to slack returned an error %s, the response is:\n%s'
+            % (response.status_code, response.text)
+        )
+    else:
+        print(f'slack alert sent: {slack_data}')
 
 def check_token(secret):
     # renew access_token by refresh_token, refresh_token expires in 365 days and can only be renewed with user login and auth through brower. Send slack alert if refresh token renew is required.
@@ -54,15 +68,15 @@ def check_token(secret):
             if  refresh_token_expires_in > send_alert_time:
                 print('Linkedin refresh token is not expiring yet')
                 # new linkedin access token takes a few seconds to active, adding timeout to avoid error {"serviceErrorCode":65601,"message":"The token used in the request has been revoked by the user","status":401} 
-                time.sleep(5)
-                return response_json['access_token']
             else:
                 print('Refresh token expiring soon')
                 # only send slack alert when paid function is called to avoid too many warnings
+            time.sleep(5)
+            return response_json['access_token']
     except Exception as e:
             print("Failed to check refresh token expiry:%s\n" % e)
 
-def get_organic_list(account_id,yesterday_ts_start,today_ts_start,last_year,access_token):
+def get_organic_list(account_id,last_year,access_token):
     """
     Function to get organic posts list
     maxiumn campaign per API request is 100
@@ -186,76 +200,81 @@ def get_organic_data(yesterday_ts_start,today_ts_start,headers,org_id,post,date)
     return
  
 def main(request):
-    secret = get_secret()
-    access_token = check_token(secret)
-    headers = {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept': 'application/json',
-        'Authorization': f'Bearer {access_token}',
-        'cache-control': 'no-cache'
-    }
     #read the data passed from the scheduler
     request_json = request.get_json(force=True)
-    ORG_ID = request_json['linkedin_organization_id']
-    PROJECT = request_json['gcp_project_id']
-    DATASET = request_json['bq_dataset']
-    TABLE_ORGANIC = request_json['bq_table_organic']
-    
-    # linkedin API only supports UTC timestamps based data. Keeping timezone function here in case the API will add timezone support in the future.
-    fmt = "%Y-%m-%d"
-    timezonelist = ['Etc/Greenwich']
-    for zone in timezonelist:
-        tz = timezone(zone)
-        now_time = datetime.now(tz)
-        yesterday = now_time - timedelta(44)  # 1 days back
-        date = datetime.strftime(yesterday, fmt)
+    try:
+        secret = get_secret()
+        access_token = check_token(secret)
+        headers = {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'application/json',
+            'Authorization': f'Bearer {access_token}',
+            'cache-control': 'no-cache'
+        }
 
-        # the timestamp of start of yesterday
-        yesterday_ts_start = tz.localize(datetime(yesterday.year,yesterday.month,yesterday.day,0,0,0)).timestamp() 
+        account_id = request_json['account_id']
+        client_project_id = request_json['client_project_id']
+        destination_table = request_json['destination_table']
+        destination_loc =request_json['dataset_loc']
+        
+        # linkedin API only supports UTC timestamps based data. Keeping timezone function here in case the API will add timezone support in the future.
+        fmt = "%Y-%m-%d"
+        timezonelist = ['Etc/Greenwich']
+        for zone in timezonelist:
+            tz = timezone(zone)
+            now_time = datetime.now(tz)
+            yesterday = now_time - timedelta(1)  # 1 days back
+            date = datetime.strftime(yesterday, fmt)
 
-        # the timestamp of start of today. Organic metric API does not work on yesterday_ts_start to yesterday_ts_end, but works on yesterday_ts_start to today_ts_start
-        today_ts_start = yesterday_ts_start + 86400
-      
-        # for filtering organic posts
-        last_year = datetime(now_time.year-1,now_time.month,now_time.day,0,0,0).timestamp()
+            # the timestamp of start of yesterday
+            yesterday_ts_start = tz.localize(datetime(yesterday.year,yesterday.month,yesterday.day,0,0,0)).timestamp() 
 
-        print("Time in GMT now %s" %now_time)
-        print("Appending data for GMT %s"%date)
+            # the timestamp of start of today. Organic metric API does not work on yesterday_ts_start to yesterday_ts_end, but works on yesterday_ts_start to today_ts_start
+            today_ts_start = yesterday_ts_start + 86400
+        
+            # for filtering organic posts
+            last_year = datetime(now_time.year-1,now_time.month,now_time.day,0,0,0).timestamp()
 
-        # init BQ client
-        client = bigquery.Client()
-        job_config = bigquery.LoadJobConfig()
-        table_ref_organic = client.dataset(DATASET).table(TABLE_ORGANIC)
-                
-        # Getting organic posts list                               
-        new_post_list = get_organic_list(ORG_ID,yesterday_ts_start, today_ts_start,last_year,access_token)
-        time.sleep(5)
+            print("\nTime in GMT now %s" %now_time)
+            print("Appending data for GMT %s"%date)
 
-        # Getting organic data
-        organic_data = []
-        if new_post_list:
-            for post in new_post_list:                
-                post_data = get_organic_data(yesterday_ts_start,today_ts_start,headers,ORG_ID,post,date)
-                if post_data:
-                    organic_data += post_data
-        df_organic = pd.DataFrame.from_dict(organic_data)
+            # init BQ client
+            scopes=["https://www.googleapis.com/auth/bigquery"]
+            credentials = service_account.Credentials.from_service_account_file(SERVICE_CREDENTIALS, scopes=scopes)
+            client_bq = bigquery.Client(credentials=credentials,project=client_project_id,location=destination_loc)
+            job_config = bigquery.LoadJobConfig()                    
+            # Getting organic posts list                               
+            new_post_list = get_organic_list(account_id,last_year,access_token)
+            time.sleep(5)
 
-        # writing organic data to BigQuery table
-        try:
-            if not df_organic.empty:
-                job_organic = client.load_table_from_dataframe(df_organic,table_ref_organic,job_config=job_config,project=PROJECT)
-                job_organic.result()
-                print("Organic records written to BQ table")
-            else:
-                print('No organic data returned, BQ not called')            
-        except Exception as e:
-            print("Failed to write organic data to table:%s\n" % e)
+            # Getting organic data
+            organic_data = []
+            if new_post_list:
+                for post in new_post_list:                
+                    post_data = get_organic_data(yesterday_ts_start,today_ts_start,headers,account_id,post,date)
+                    if post_data:
+                        organic_data += post_data
+            df_organic = pd.DataFrame.from_dict(organic_data)
+
+            # writing organic data to BigQuery table
+            try:
+                if not df_organic.empty:
+                    job_organic = client_bq.load_table_from_dataframe(df_organic,destination_table,job_config=job_config,project=client_project_id)
+                    job_organic.result()
+                    print("Organic records written to BQ table")
+                else:
+                    print('No organic data returned, BQ not called')            
+            except Exception as e:
+                print("Failed to write organic data to table:%s\n" % e)
+                send_slack_alert(f'Linkedin organic data failed to write to BQ table {destination_table} for campaign accout {account_id}')
+    except Exception as e:
+        print("Failed to write organic data to table:%s\n" % e)
+        send_slack_alert(f'Linkedin organic function failed for {request_json}, error: {e}')
     return 'finished'
 
-
-# Local testing, using mock package to  
-if __name__ == '__main__': 
-    from unittest.mock import Mock
-    data=config.TEST_CONFIG
-    main(Mock(get_json=Mock(return_value=data)))
+# # Local testing, using mock package to  
+# if __name__ == '__main__': 
+#     from unittest.mock import Mock
+#     data=config.TEST_CONFIG
+#     main(Mock(get_json=Mock(return_value=data)))
 

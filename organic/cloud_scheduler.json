@@ -1,3 +1,2 @@
-
 // cloud scheduler body
-{"linkedin_organization_id":"linkedin_organization_id","gcp_project_id":"gcp_project_id","bq_dataset":"bq_dataset","bq_table_organic":"bq_table_organic" }
+{"account_id":"client_linkedin_organisation_id", "client_project_id":"client_gcp_project_id","destination_table":"projectId.datasetId.tableId","dataset_loc":"dataset_loc" }
